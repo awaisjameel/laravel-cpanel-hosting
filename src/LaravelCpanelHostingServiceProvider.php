@@ -2,9 +2,9 @@
 
 namespace Awaisjameel\LaravelCpanelHosting;
 
+use Awaisjameel\LaravelCpanelHosting\Commands\LaravelCpanelHostingCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Awaisjameel\LaravelCpanelHosting\Commands\LaravelCpanelHostingCommand;
 
 class LaravelCpanelHostingServiceProvider extends PackageServiceProvider
 {

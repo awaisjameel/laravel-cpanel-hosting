@@ -2,9 +2,9 @@
 
 namespace Awaisjameel\LaravelCpanelHosting\Tests;
 
+use Awaisjameel\LaravelCpanelHosting\LaravelCpanelHostingServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use Awaisjameel\LaravelCpanelHosting\LaravelCpanelHostingServiceProvider;
 
 class TestCase extends Orchestra
 {
