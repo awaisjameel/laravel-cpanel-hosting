@@ -1,19 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Awaisjameel\LaravelCpanelHosting\Commands;
 
 use Illuminate\Console\Command;
 
-class LaravelCpanelHostingCommand extends Command
+final class LaravelCpanelHostingCommand extends Command
 {
-    public $signature = 'laravel-cpanel-hosting';
+    protected $signature = 'laravel-cpanel-hosting';
 
-    public $description = 'My command';
+    protected $description = 'Alias for cpanel-hosting:install.';
 
     public function handle(): int
     {
-        $this->comment('All done');
-
-        return self::SUCCESS;
+        return $this->call('cpanel-hosting:install');
     }
 }

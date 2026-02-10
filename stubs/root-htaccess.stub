@@ -1,0 +1,37 @@
+# Root .htaccess for Laravel on cPanel/shared hosting
+# This file keeps your app root clean while serving assets from /public.
+
+Options -Indexes
+RewriteEngine On
+
+# Force HTTPS (optional). Uncomment if your host always supports HTTPS.
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Block direct access to sensitive files
+<FilesMatch "(^\.env|composer\.(json|lock)|phpunit\.xml|artisan)$">
+    Require all denied
+</FilesMatch>
+
+# Block internal framework directories from direct web access
+RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)/ - [F,L,NC]
+
+# Prevent duplicate /public URLs
+RewriteRule ^public/(.*)$ /$1 [R=301,L,NC]
+
+# Serve files directly from /public when they exist there
+RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
+RewriteRule ^(.+)$ public/$1 [L]
+
+# Fallback all remaining requests to Laravel front controller
+RewriteRule ^$ public/index.php [L]
+RewriteRule (.*) public/index.php [L]
+
+# Basic security headers (adjust CSP for your app)
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Content-Security-Policy "default-src 'self';"
+</IfModule>

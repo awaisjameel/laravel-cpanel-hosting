@@ -1,84 +1,81 @@
-# A robust, secure, and production-ready Laravel package that makes deploying Laravel applications on **cPanel / shared hosting** painless and professional.
+# Laravel cPanel Hosting
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/awaisjameel/laravel-cpanel-hosting.svg?style=flat-square)](https://packagist.org/packages/awaisjameel/laravel-cpanel-hosting)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/awaisjameel/laravel-cpanel-hosting/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/awaisjameel/laravel-cpanel-hosting/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/awaisjameel/laravel-cpanel-hosting/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/awaisjameel/laravel-cpanel-hosting/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/awaisjameel/laravel-cpanel-hosting.svg?style=flat-square)](https://packagist.org/packages/awaisjameel/laravel-cpanel-hosting)
+Laravel package for secure shared-hosting deployment endpoints and cPanel-friendly root hosting setup.
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
+## Features
 
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-cpanel-hosting.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-cpanel-hosting)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+- Secure deploy endpoints with token or webhook signature validation
+- Configurable deployment pipeline (`/deploy`)
+- `.env` sync with optional backup and required-key validation
+- Storage link fallback (`symlink` -> recursive copy)
+- Installer command for config + root `index.php` and `.htaccess` stubs
+- Dedicated deploy logging channel
+- Optional MySQL legacy index-length compatibility
 
 ## Installation
-
-You can install the package via composer:
 
 ```bash
 composer require awaisjameel/laravel-cpanel-hosting
 ```
 
-You can publish and run the migrations with:
+Run installer:
 
 ```bash
-php artisan vendor:publish --tag="laravel-cpanel-hosting-migrations"
-php artisan migrate
+php artisan cpanel-hosting:install
 ```
 
-You can publish the config file with:
+## Configuration
+
+Publish config manually if needed:
 
 ```bash
-php artisan vendor:publish --tag="laravel-cpanel-hosting-config"
+php artisan vendor:publish --tag="cpanel-hosting-config"
 ```
 
-This is the contents of the published config file:
+Key env values:
 
-```php
-return [
-];
+```dotenv
+CPANEL_DEPLOY_ENABLED=false
+CPANEL_DEPLOY_TOKEN=
+CPANEL_DEPLOY_WEBHOOK_SECRET=
+CPANEL_DEPLOY_PREFIX=deploy
+CPANEL_DEPLOY_ALLOWED_IPS=
+CPANEL_DEPLOY_LOG_CHANNEL=deploy
 ```
 
-Optionally, you can publish the views using
+## Endpoints
 
-```bash
-php artisan vendor:publish --tag="laravel-cpanel-hosting-views"
-```
+When enabled, routes are exposed under `CPANEL_DEPLOY_PREFIX` (default `deploy`):
 
-## Usage
+- `GET /deploy` full pipeline
+- `GET /deploy/sync-env`
+- `GET /deploy/clear`
+- `GET /deploy/migrate`
+- `GET /deploy/migrate-fresh`
+- `GET /deploy/cache`
+- `GET /deploy/queue-restart`
+- `GET /deploy/storage-link`
+- `GET /deploy/maintenance-down`
+- `GET /deploy/maintenance-up`
+- `GET /deploy/optimize`
+- `GET /deploy/health`
 
-```php
-$laravelCpanelHosting = new Awaisjameel\LaravelCpanelHosting();
-echo $laravelCpanelHosting->echoPhrase('Hello, Awaisjameel!');
-```
+Authentication:
+
+- `X-Deploy-Token: {token}` header (preferred)
+- `?token={token}` query parameter
+- `X-Hub-Signature-256` / `X-Gitlab-Token` webhook verification when configured
+
+## Security Notes
+
+- Keep `CPANEL_DEPLOY_TOKEN` secret and rotate on exposure.
+- Prefer header token over query token.
+- Restrict with `CPANEL_DEPLOY_ALLOWED_IPS` when possible.
+- Do not expose deploy routes with `APP_DEBUG=true`.
+- `migrate-fresh` is destructive.
 
 ## Testing
 
 ```bash
 composer test
 ```
-
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [awaisjameel](https://github.com/awaisjameel)
-- [All Contributors](../../contributors)
-
-## License
-
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.

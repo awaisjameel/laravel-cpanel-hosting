@@ -1,37 +1,36 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Awaisjameel\LaravelCpanelHosting\Tests;
 
 use Awaisjameel\LaravelCpanelHosting\LaravelCpanelHostingServiceProvider;
-use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Factory::guessFactoryNamesUsing(
-            fn (string $modelName) => 'Awaisjameel\\LaravelCpanelHosting\\Database\\Factories\\'.class_basename($modelName).'Factory'
-        );
-    }
-
-    protected function getPackageProviders($app)
+    /**
+     * @param  \Illuminate\Foundation\Application  $app
+     * @return array<int, string>
+     */
+    protected function getPackageProviders($app): array
     {
         return [
             LaravelCpanelHostingServiceProvider::class,
         ];
     }
 
-    public function getEnvironmentSetUp($app)
+    /**
+     * @param  \Illuminate\Foundation\Application  $app
+     */
+    protected function getEnvironmentSetUp($app): void
     {
-        config()->set('database.default', 'testing');
-
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
+        $app['config']->set('cpanel-hosting.enabled', true);
+        $app['config']->set('cpanel-hosting.token', 'test-deploy-token');
+        $app['config']->set('cpanel-hosting.route_prefix', 'deploy');
+        $app['config']->set('logging.channels.deploy', [
+            'driver' => 'single',
+            'path' => storage_path('logs/deploy-test.log'),
+        ]);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Awaisjameel\LaravelCpanelHosting\Facades;
 
 use Illuminate\Support\Facades\Facade;
@@ -7,7 +9,7 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @see \Awaisjameel\LaravelCpanelHosting\LaravelCpanelHosting
  */
-class LaravelCpanelHosting extends Facade
+final class LaravelCpanelHosting extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
