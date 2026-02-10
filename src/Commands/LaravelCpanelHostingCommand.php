@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Awaisjameel\LaravelCpanelHosting\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class LaravelCpanelHostingCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'laravel-cpanel-hosting';
 
     public $description = 'My command';
 

@@ -1,17 +1,17 @@
 {
-    "name": ":vendor_slug/:package_slug",
-    "description": ":package_description",
+    "name": "awaisjameel/laravel-cpanel-hosting",
+    "description": "A robust, secure, and production-ready Laravel package that makes deploying Laravel applications on **cPanel / shared hosting** painless and professional.",
     "keywords": [
-        ":vendor_name",
+        "awaisjameel",
         "laravel",
-        ":package_slug"
+        "laravel-cpanel-hosting"
     ],
-    "homepage": "https://github.com/:vendor_slug/:package_slug",
+    "homepage": "https://github.com/awaisjameel/laravel-cpanel-hosting",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": "author@domain.com",
+            "name": "awaisjameel",
+            "email": "awais.jameel@ymail.com",
             "role": "Developer"
         }
     ],
@@ -30,18 +30,17 @@
         "pestphp/pest-plugin-laravel": "^4.0",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "phpstan/phpstan-phpunit": "^2.0",
-        "spatie/laravel-ray": "^1.35"
+        "phpstan/phpstan-phpunit": "^2.0"
     },
     "autoload": {
         "psr-4": {
-            "VendorName\\Skeleton\\": "src/",
-            "VendorName\\Skeleton\\Database\\Factories\\": "database/factories/"
+            "Awaisjameel\\LaravelCpanelHosting\\": "src/",
+            "Awaisjameel\\LaravelCpanelHosting\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "VendorName\\Skeleton\\Tests\\": "tests/",
+            "Awaisjameel\\LaravelCpanelHosting\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/"
         }
     },
@@ -63,10 +62,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "VendorName\\Skeleton\\SkeletonServiceProvider"
+                "Awaisjameel\\LaravelCpanelHosting\\LaravelCpanelHostingServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "VendorName\\Skeleton\\Facades\\Skeleton"
+                "LaravelCpanelHosting": "Awaisjameel\\LaravelCpanelHosting\\Facades\\LaravelCpanelHosting"
             }
         }
     },

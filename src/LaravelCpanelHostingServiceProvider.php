@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace Awaisjameel\LaravelCpanelHosting;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use VendorName\Skeleton\Commands\SkeletonCommand;
+use Awaisjameel\LaravelCpanelHosting\Commands\LaravelCpanelHostingCommand;
 
-class SkeletonServiceProvider extends PackageServiceProvider
+class LaravelCpanelHostingServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
@@ -16,10 +16,10 @@ class SkeletonServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('skeleton')
+            ->name('laravel-cpanel-hosting')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_migration_table_name_table')
-            ->hasCommand(SkeletonCommand::class);
+            ->hasMigration('create_laravel_cpanel_hosting_table')
+            ->hasCommand(LaravelCpanelHostingCommand::class);
     }
 }
