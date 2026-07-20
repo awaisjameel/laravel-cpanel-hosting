@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Awaisjameel\LaravelCpanelHosting\Actions;
 
+use FilesystemIterator;
 use Illuminate\Support\Facades\File;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Throwable;
 
 final class StorageLinkAction
@@ -169,12 +172,11 @@ final class StorageLinkAction
 
     private function applyPermissions(string $target): void
     {
-        foreach (File::allDirectories($target) as $directory) {
-            @chmod($directory, 0755);
-        }
+        $directory = new RecursiveDirectoryIterator($target, FilesystemIterator::SKIP_DOTS);
+        $iterator = new RecursiveIteratorIterator($directory, RecursiveIteratorIterator::SELF_FIRST);
 
-        foreach (File::allFiles($target) as $file) {
-            @chmod($file->getPathname(), 0644);
+        foreach ($iterator as $item) {
+            @chmod($item->getPathname(), $item->isDir() ? 0755 : 0644);
         }
     }
 

@@ -12,6 +12,11 @@ Laravel package for secure shared-hosting deployment endpoints and cPanel-friend
 - Dedicated deploy logging channel
 - Optional MySQL legacy index-length compatibility
 
+## Requirements
+
+- PHP 8.2+
+- Laravel 11.x, 12.x, or 13.x
+
 ## Installation
 
 ```bash

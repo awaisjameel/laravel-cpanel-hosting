@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-cpanel-hosting` will be documented in this file.
 
+## v1.1.0 - Laravel 13 & PHP 8.5 support - 2026-07-20
+
+- Added support for Laravel 13 (`illuminate/contracts`/`illuminate/support` `^13.0`) and `orchestra/testbench` `^11.0`.
+- Dropped support for Laravel 10, which reached end of security support in February 2025 and can no longer be tested against the current Pest/Testbench toolchain.
+- Fixed `StorageLinkAction`'s copy-fallback permission step, which called `Illuminate\Filesystem\Filesystem::allDirectories()` — a method that only exists on Laravel 12+. On Laravel 11 this threw a `BadMethodCallException` after every successful directory copy, causing the storage-link copy fallback (the primary path on shared hosts without `symlink()`) to always report failure. Replaced with a version-independent `RecursiveDirectoryIterator` walk.
+- Removed unused Spatie skeleton leftovers (`database/migrations`, `database/factories`, `resources/views`) that were never wired into the service provider.
+- Expanded CI matrix to PHP 8.3–8.5 and Laravel 11–13.
+
 ## v1.0.0 - Initial Stable Release - 2026-02-10
 
 `laravel-cpanel-hosting` `v1.0.0` is the first stable release.
@@ -16,5 +24,3 @@ All notable changes to `laravel-cpanel-hosting` will be documented in this file.
 - Updated package docs/config for production usage.
 - Added feature/unit tests for deploy routes, middleware behavior, and critical actions.
 - Verified quality with passing test suite and static analysis.
-
-If you want, I can also generate a shorter “GitHub Releases style” version and a `CHANGELOG.md` entry block.

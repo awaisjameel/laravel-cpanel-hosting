@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Awaisjameel\LaravelCpanelHosting\Tests;
 
 use Awaisjameel\LaravelCpanelHosting\LaravelCpanelHostingServiceProvider;
+use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {
     /**
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      * @return array<int, string>
      */
     protected function getPackageProviders($app): array
@@ -21,7 +22,7 @@ class TestCase extends Orchestra
     }
 
     /**
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      */
     protected function getEnvironmentSetUp($app): void
     {
