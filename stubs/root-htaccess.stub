@@ -1,37 +1,47 @@
-# Root .htaccess for Laravel on cPanel/shared hosting
-# This file keeps your app root clean while serving assets from /public.
-
-Options -Indexes
+# Apache 2.4 / LiteSpeed: serve the project's public directory only.
+Options -Indexes -MultiViews
+DirectoryIndex index.php
 RewriteEngine On
 
-# Force HTTPS (optional). Uncomment if your host always supports HTTPS.
-# RewriteCond %{HTTPS} !=on
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Preserve headers consumed by Laravel under CGI / FastCGI.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteCond %{HTTP:X-XSRF-Token} .
+RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-# Block direct access to sensitive files
-<FilesMatch "(^\.env|composer\.(json|lock)|phpunit\.xml|artisan)$">
+# Optional HTTPS redirect (enable only after configuring your host/proxy).
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,END]
+
+<FilesMatch "(?i)(^\.env(?:\..*)?$|^composer\.(?:json|lock)$|^package(?:-lock)?\.json$|^pnpm-lock\.yaml$|^phpunit\.xml(?:\.dist)?$|^artisan$|\.backup\.|\.(?:bak|sql|log)$)">
     Require all denied
 </FilesMatch>
 
-# Block internal framework directories from direct web access
-RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)/ - [F,L,NC]
+# Dotfiles and hidden directories must not be exposed, including under public/.
+RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,END]
 
-# Prevent duplicate /public URLs
-RewriteRule ^public/(.*)$ /$1 [R=301,L,NC]
+# cPanel AutoSSL may place its HTTP validation files at the project root.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^\.well-known/(?:acme-challenge|pki-validation)/[^/]+$ - [END]
 
-# Serve files directly from /public when they exist there
-RewriteCond %{DOCUMENT_ROOT}/public/$1 -f [OR]
-RewriteCond %{DOCUMENT_ROOT}/public/$1 -d
-RewriteRule ^(.+)$ public/$1 [L]
+# Only redirect client requests, never the internal rewrite below.
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*public(?:[/\s?]) [NC]
+RewriteCond %{REQUEST_URI} ^(.*/)public(?:/|$) [NC]
+RewriteRule ^public(?:/(.*))?$ %1$1 [R=301,END]
 
-# Fallback all remaining requests to Laravel front controller
-RewriteRule ^$ public/index.php [L]
-RewriteRule (.*) public/index.php [L]
+# The second pass is already inside public/. Assets (including storage links)
+# are served directly; application URLs use the Laravel front controller.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^public(?:/|$) - [END]
+RewriteRule ^public(?:/.*)?$ public/index.php [END]
 
-# Basic security headers (adjust CSP for your app)
+# Relative substitutions preserve installations in a URL subdirectory.
+RewriteRule ^(.*)$ public/$1 [L]
+
 <IfModule mod_headers.c>
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    Header always set Content-Security-Policy "default-src 'self';"
 </IfModule>
+# Configure a Content-Security-Policy in the application to match its assets.

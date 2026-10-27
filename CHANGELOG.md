@@ -2,6 +2,22 @@
 
 All notable changes to `laravel-cpanel-hosting` will be documented in this file.
 
+## v2.0.0 - 2026-10-26
+
+- Enforce Pint, PHPStan, strict manifest validation and dependency audits on pull requests and pushes; consolidate duplicate/automatic-formatting workflows.
+
+- Require POST for every mutating action and header/webhook authentication; remove mutating GET routes and query-string token authentication. Health remains GET.
+
+- Support maintained PHP 8.2–8.5 and Laravel 12–13; refresh runtime and development dependencies and CI.
+- Validate environment syntax and required keys before atomic replacement; use private, unique backups and preserve the active file on validation failure.
+- Stage storage links/copies before replacement; reject overlapping paths and protected roots, preserve sources and restore the previous target if promotion fails.
+- Use persistent Laravel cache-backed rate limiting with a file store by default and return `Retry-After` when throttled.
+- Register deploy routes during production console boot for route caching and keep authenticated deployment endpoints reachable through normal maintenance middleware.
+- Unify pipeline and endpoint execution, fix the `cache` helper/name collision, validate callback results, handle callback failures and redact sensitive Artisan parameters/output.
+- Add container-resolved deployment step classes for cacheable configuration; empty pipelines fail without implicit migrations.
+- Make installer failures return nonzero exit codes, validate option combinations, atomically write files and safely quote literal environment values.
+- Fix Apache public redirects, subdirectory hosting, storage assets, environment/backup protection and AutoSSL challenges; add actual Apache HTTP regression tests.
+
 ## v1.1.0 - Laravel 13 & PHP 8.5 support - 2026-07-20
 
 - Added support for Laravel 13 (`illuminate/contracts`/`illuminate/support` `^13.0`) and `orchestra/testbench` `^11.0`.

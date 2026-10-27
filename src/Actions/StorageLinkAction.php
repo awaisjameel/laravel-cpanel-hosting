@@ -4,194 +4,97 @@ declare(strict_types=1);
 
 namespace Awaisjameel\LaravelCpanelHosting\Actions;
 
+use Awaisjameel\LaravelCpanelHosting\Support\Paths;
+use Awaisjameel\LaravelCpanelHosting\Support\Settings;
+use Awaisjameel\LaravelCpanelHosting\Support\StepResult;
 use FilesystemIterator;
-use Illuminate\Support\Facades\File;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 
+/** @phpstan-import-type Result from StepResult */
 final class StorageLinkAction
 {
-    /**
-     * @return array{success: bool, message: string, data: array<string, mixed>, errors: string[]}
-     */
+    /** @return Result */
     public function execute(): array
     {
-        $source = $this->resolveSourcePath();
-        $target = $this->resolvePublicPath();
-
-        if (! File::isDirectory($source)) {
-            return $this->failure("Storage source directory does not exist: {$source}");
-        }
-
-        $preferSymlink = (bool) config('cpanel-hosting.storage_link.prefer_symlink', true);
-        $fallbackCopy = (bool) config('cpanel-hosting.storage_link.fallback_copy', true);
-
-        $symlinkError = null;
-
-        if ($preferSymlink && $this->createSymlink($source, $target, $symlinkError)) {
-            return [
-                'success' => true,
-                'message' => 'Storage linked using symlink.',
-                'data' => [
-                    'mode' => 'symlink',
-                    'source' => $source,
-                    'target' => $target,
-                ],
-                'errors' => [],
-            ];
-        }
-
-        if (! $fallbackCopy) {
-            return $this->failure(
-                'Symlink creation failed and copy fallback is disabled.',
-                ['source' => $source, 'target' => $target],
-                $symlinkError !== null ? [$symlinkError] : []
-            );
-        }
-
+        $filesystem = new Filesystem;
+        $candidate = null;
         try {
-            $this->removeExistingTarget($target);
-            File::ensureDirectoryExists($target);
-
-            if (! File::copyDirectory($source, $target)) {
-                return $this->failure('Failed to copy storage directory to public path.', [
-                    'source' => $source,
-                    'target' => $target,
-                ]);
-            }
-
-            $this->applyPermissions($target);
-
+            $source = Paths::resolve(Settings::text('storage_link.source', 'app/public'), storage_path());
+            $target = Paths::resolve(Settings::text('storage_link.public_path', 'storage'), public_path());
+            Paths::assertStorageTarget($source, $target);
+            $filesystem->mkdir(dirname($target));
+            $candidate = dirname($target).'/.cpanel-storage-'.bin2hex(random_bytes(12));
+            $preferSymlink = Settings::flag('storage_link.prefer_symlink', true);
+            $fallbackCopy = Settings::flag('storage_link.fallback_copy', true);
             $warnings = [];
-            if ($symlinkError !== null) {
-                $warnings[] = $symlinkError;
+            $mode = 'copy';
+            if ($preferSymlink) {
+                if (is_link($target) && realpath($target) === realpath($source)) {
+                    return StepResult::make(true, 'Storage already linked.', ['mode' => 'symlink', 'source' => $source, 'target' => $target]);
+                }
+                try {
+                    $filesystem->symlink($source, $candidate);
+                    $mode = 'symlink';
+                } catch (Throwable $exception) {
+                    if (! $fallbackCopy) {
+                        throw $exception;
+                    }
+                    $warnings[] = 'Symlink creation was unavailable; used directory copy.';
+                }
+            } elseif (! $fallbackCopy) {
+                return StepResult::make(false, 'Both storage linking methods are disabled.');
+            }
+            if ($mode === 'copy') {
+                // A new target keeps the previous public tree intact if copying fails.
+                $filesystem->mirror($source, $candidate);
+                $filesystem->chmod($candidate, 0755);
+                $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($candidate, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
+                foreach ($iterator as $item) {
+                    if (! $item->isLink()) {
+                        $filesystem->chmod($item->getPathname(), $item->isDir() ? 0755 : 0644);
+                    }
+                }
+            }
+            $backup = null;
+            if (file_exists($target) || is_link($target)) {
+                $backup = dirname($target).'/.cpanel-old-'.bin2hex(random_bytes(12));
+                $filesystem->rename($target, $backup);
+            }
+            try {
+                $filesystem->rename($candidate, $target);
+                $candidate = null;
+            } catch (Throwable $exception) {
+                if ($backup !== null) {
+                    $filesystem->rename($backup, $target);
+                }
+                throw $exception;
+            }
+            if ($backup !== null) {
+                try {
+                    $filesystem->remove($backup);
+                } catch (Throwable $exception) {
+                    report($exception);
+                    $warnings[] = 'Previous storage target backup could not be removed.';
+                }
             }
 
-            return [
-                'success' => true,
-                'message' => 'Storage mirrored by directory copy fallback.',
-                'data' => [
-                    'mode' => 'copy',
-                    'source' => $source,
-                    'target' => $target,
-                ],
-                'errors' => $warnings,
-            ];
+            return StepResult::make(true, $mode === 'symlink' ? 'Storage linked using symlink.' : 'Storage mirrored by directory copy fallback.', ['mode' => $mode, 'source' => $source, 'target' => $target], $warnings);
         } catch (Throwable $exception) {
             report($exception);
 
-            return $this->failure('Storage link action failed.', [
-                'source' => $source,
-                'target' => $target,
-            ]);
-        }
-    }
-
-    private function resolveSourcePath(): string
-    {
-        $configured = (string) config('cpanel-hosting.storage_link.source', 'app/public');
-
-        if ($this->isAbsolutePath($configured)) {
-            return $configured;
-        }
-
-        return storage_path($configured);
-    }
-
-    private function resolvePublicPath(): string
-    {
-        $configured = (string) config('cpanel-hosting.storage_link.public_path', 'storage');
-
-        if ($this->isAbsolutePath($configured)) {
-            return $configured;
-        }
-
-        return public_path($configured);
-    }
-
-    private function isAbsolutePath(string $path): bool
-    {
-        return str_starts_with($path, '/') || preg_match('/^[A-Za-z]:\\\\/', $path) === 1;
-    }
-
-    private function createSymlink(string $source, string $target, ?string &$error): bool
-    {
-        if (! function_exists('symlink')) {
-            $error = 'symlink() is not available on this host.';
-
-            return false;
-        }
-
-        try {
-            if (is_link($target)) {
-                $existingTarget = readlink($target);
-                if ($existingTarget !== false && realpath($existingTarget) === realpath($source)) {
-                    return true;
+            return StepResult::make(false, 'Storage link action failed. Check source/target paths, overlap and permissions.');
+        } finally {
+            if ($candidate !== null && (file_exists($candidate) || is_link($candidate))) {
+                // Only this operation's random staging path is eligible for removal.
+                try {
+                    $filesystem->remove($candidate);
+                } catch (Throwable $exception) {
+                    report($exception);
                 }
-
-                @unlink($target);
-            } elseif (File::exists($target)) {
-                $this->removeExistingTarget($target);
             }
-
-            set_error_handler(static function (int $severity, string $message) use (&$error): bool {
-                $error = $message;
-
-                return true;
-            });
-
-            $created = symlink($source, $target);
-            restore_error_handler();
-
-            if (! $created) {
-                $error ??= 'symlink() returned false.';
-            }
-
-            return $created;
-        } catch (Throwable $exception) {
-            restore_error_handler();
-            $error = $exception->getMessage();
-
-            return false;
         }
-    }
-
-    private function removeExistingTarget(string $target): void
-    {
-        if (is_link($target) || File::isFile($target)) {
-            File::delete($target);
-
-            return;
-        }
-
-        if (File::isDirectory($target)) {
-            File::deleteDirectory($target);
-        }
-    }
-
-    private function applyPermissions(string $target): void
-    {
-        $directory = new RecursiveDirectoryIterator($target, FilesystemIterator::SKIP_DOTS);
-        $iterator = new RecursiveIteratorIterator($directory, RecursiveIteratorIterator::SELF_FIRST);
-
-        foreach ($iterator as $item) {
-            @chmod($item->getPathname(), $item->isDir() ? 0755 : 0644);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @param  string[]  $errors
-     * @return array{success: bool, message: string, data: array<string, mixed>, errors: string[]}
-     */
-    private function failure(string $message, array $data = [], array $errors = []): array
-    {
-        return [
-            'success' => false,
-            'message' => $message,
-            'data' => $data,
-            'errors' => $errors === [] ? [$message] : $errors,
-        ];
     }
 }

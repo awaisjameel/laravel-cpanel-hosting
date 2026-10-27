@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Awaisjameel\LaravelCpanelHosting;
 
+use Awaisjameel\LaravelCpanelHosting\Support\Settings;
+
 final class LaravelCpanelHosting
 {
     public function isEnabled(): bool
     {
-        return (bool) config('cpanel-hosting.enabled', false);
+        return Settings::flag('enabled', false);
     }
 
     public function routePrefix(): string
     {
-        return (string) config('cpanel-hosting.route_prefix', 'deploy');
+        return Settings::text('route_prefix', 'deploy');
     }
 }
