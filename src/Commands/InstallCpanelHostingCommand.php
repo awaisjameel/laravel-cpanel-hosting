@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Awaisjameel\LaravelCpanelHosting\Commands;
 
+use Awaisjameel\LaravelCpanelHosting\Support\AtomicFiles;
+use Awaisjameel\LaravelCpanelHosting\Support\EnvironmentFile;
+use Awaisjameel\LaravelCpanelHosting\Support\Settings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 final class InstallCpanelHostingCommand extends Command
 {
@@ -23,36 +28,51 @@ final class InstallCpanelHostingCommand extends Command
         $onlyConfig = (bool) $this->option('only-config');
         $onlyRoot = (bool) $this->option('only-root');
 
-        if (! $onlyRoot) {
-            $this->publishConfig($force);
+        if ($onlyConfig && $onlyRoot) {
+            $this->components->error('--only-config and --only-root cannot be combined.');
+
+            return self::INVALID;
         }
 
-        if (! $onlyConfig) {
-            $this->installRootStubs($force);
-        }
+        try {
+            if (! $onlyRoot) {
+                $this->publishConfig($force);
+            }
 
-        if (! $this->input->isInteractive()) {
+            if (! $onlyConfig) {
+                $this->installRootStubs($force);
+            }
+
+            if (! $this->input->isInteractive()) {
+                $this->appendEnvExampleKeys();
+
+                return self::SUCCESS;
+            }
+
+            $this->configureEnvironment();
             $this->appendEnvExampleKeys();
 
+            $this->components->info('laravel-cpanel-hosting installed successfully.');
+            $this->line('Set CPANEL_DEPLOY_ENABLED=true when you are ready to expose deploy routes.');
+            $this->line('Prefer sending your deploy token in the X-Deploy-Token header.');
+
             return self::SUCCESS;
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->components->error('Installation failed. Check filesystem permissions and the application log.');
+
+            return self::FAILURE;
         }
-
-        $this->configureEnvironment();
-        $this->appendEnvExampleKeys();
-
-        $this->components->info('laravel-cpanel-hosting installed successfully.');
-        $this->line('Set CPANEL_DEPLOY_ENABLED=true when you are ready to expose deploy routes.');
-        $this->line('Prefer sending your deploy token in the X-Deploy-Token header.');
-
-        return self::SUCCESS;
     }
 
     private function publishConfig(bool $force): void
     {
-        $this->call('vendor:publish', [
+        if ($this->call('vendor:publish', [
             '--tag' => 'cpanel-hosting-config',
             '--force' => $force,
-        ]);
+        ]) !== self::SUCCESS) {
+            throw new RuntimeException('Publishing the package configuration failed.');
+        }
     }
 
     private function installRootStubs(bool $force): void
@@ -66,9 +86,7 @@ final class InstallCpanelHostingCommand extends Command
     private function copyRootFile(string $source, string $target, bool $force): void
     {
         if (! File::exists($source)) {
-            $this->components->error("Stub missing: {$source}");
-
-            return;
+            throw new RuntimeException("Stub missing: {$source}");
         }
 
         if (File::exists($target) && ! $force) {
@@ -78,20 +96,12 @@ final class InstallCpanelHostingCommand extends Command
         }
 
         if (File::exists($target)) {
-            $backupPath = $this->backupFile($target);
+            $backupPath = AtomicFiles::backup($target);
             $this->components->twoColumnDetail($target, "Backed up to {$backupPath}");
         }
 
-        File::copy($source, $target);
+        AtomicFiles::write($target, File::get($source), 0644);
         $this->components->twoColumnDetail($target, 'Installed');
-    }
-
-    private function backupFile(string $path): string
-    {
-        $backupPath = $path.'.backup.'.date('YmdHis');
-        File::copy($path, $backupPath);
-
-        return $backupPath;
     }
 
     private function configureEnvironment(): void
@@ -105,12 +115,17 @@ final class InstallCpanelHostingCommand extends Command
             $token = Str::random(64);
         }
 
-        $routePrefix = (string) $this->ask('Deploy route prefix', (string) config('cpanel-hosting.route_prefix', 'deploy'));
+        $routePrefix = $this->ask('Deploy route prefix', Settings::text('route_prefix', 'deploy'));
+        if (! is_string($routePrefix) || preg_match('/\A[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\z/', $routePrefix) !== 1) {
+            throw new RuntimeException('The deployment prefix must contain literal path segments.');
+        }
         $enableDeploy = $this->confirm('Enable deploy routes now?', false);
 
-        $this->upsertEnvValue(base_path('.env'), 'CPANEL_DEPLOY_TOKEN', $token);
-        $this->upsertEnvValue(base_path('.env'), 'CPANEL_DEPLOY_PREFIX', $routePrefix);
-        $this->upsertEnvValue(base_path('.env'), 'CPANEL_DEPLOY_ENABLED', $enableDeploy ? 'true' : 'false');
+        EnvironmentFile::update(base_path('.env'), [
+            'CPANEL_DEPLOY_TOKEN' => $token,
+            'CPANEL_DEPLOY_PREFIX' => $routePrefix,
+            'CPANEL_DEPLOY_ENABLED' => $enableDeploy ? 'true' : 'false',
+        ]);
     }
 
     private function appendEnvExampleKeys(): void
@@ -122,16 +137,27 @@ final class InstallCpanelHostingCommand extends Command
             'CPANEL_DEPLOY_WEBHOOK_SECRET=',
             'CPANEL_DEPLOY_PREFIX=deploy',
             'CPANEL_DEPLOY_ALLOWED_IPS=',
+            'CPANEL_DEPLOY_STOP_ON_FAILURE=true',
+            'CPANEL_DEPLOY_RATE_LIMIT_ENABLED=false',
+            'CPANEL_DEPLOY_RATE_LIMIT_STORE=file',
+            'CPANEL_DEPLOY_RATE_LIMIT_MAX_ATTEMPTS=30',
+            'CPANEL_DEPLOY_RATE_LIMIT_DECAY_SECONDS=60',
             'CPANEL_SYNC_ENV_SOURCE=.env.server',
             'CPANEL_SYNC_ENV_TARGET=.env',
+            'CPANEL_SYNC_ENV_BACKUP=true',
             'CPANEL_STORAGE_LINK_PREFER_SYMLINK=true',
             'CPANEL_STORAGE_LINK_FALLBACK_COPY=true',
+            'CPANEL_STORAGE_LINK_SOURCE=app/public',
+            'CPANEL_STORAGE_LINK_PUBLIC_PATH=storage',
             'CPANEL_MYSQL_LEGACY_COMPAT=true',
+            'CPANEL_MYSQL_LEGACY_LENGTH=191',
+            'CPANEL_MYSQL_LEGACY_ALL_CONNECTIONS=false',
+            'APP_MAINTENANCE_SECRET=',
             'CPANEL_DEPLOY_LOG_CHANNEL=deploy',
         ];
 
         if (! File::exists($file)) {
-            File::put($file, implode(PHP_EOL, $lines).PHP_EOL);
+            AtomicFiles::write($file, implode(PHP_EOL, $lines).PHP_EOL, 0644);
 
             return;
         }
@@ -148,21 +174,6 @@ final class InstallCpanelHostingCommand extends Command
             $content .= PHP_EOL.$line;
         }
 
-        File::put($file, $content.PHP_EOL);
-    }
-
-    private function upsertEnvValue(string $file, string $key, string $value): void
-    {
-        $line = "{$key}={$value}";
-        $content = File::exists($file) ? File::get($file) : '';
-        $pattern = '/^'.preg_quote($key, '/').'=.*$/m';
-
-        if (preg_match($pattern, $content) === 1) {
-            $content = (string) preg_replace($pattern, $line, $content);
-        } else {
-            $content = rtrim($content).PHP_EOL.$line.PHP_EOL;
-        }
-
-        File::put($file, $content);
+        AtomicFiles::write($file, $content.PHP_EOL, 0644);
     }
 }

@@ -7,7 +7,9 @@ namespace Awaisjameel\LaravelCpanelHosting;
 use Awaisjameel\LaravelCpanelHosting\Actions\StorageLinkAction;
 use Awaisjameel\LaravelCpanelHosting\Actions\SyncEnvAction;
 use Awaisjameel\LaravelCpanelHosting\Commands\InstallCpanelHostingCommand;
-use Illuminate\Support\Facades\Schema;
+use Awaisjameel\LaravelCpanelHosting\Support\Settings;
+use Illuminate\Database\Schema\Builder;
+use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -38,23 +40,24 @@ final class LaravelCpanelHostingServiceProvider extends PackageServiceProvider
 
     private function registerDeployRoutes(): void
     {
-        if (! config('cpanel-hosting.enabled', false)) {
+        if (! Settings::flag('enabled', false)) {
             return;
         }
 
-        if ($this->app->runningInConsole() && ! $this->app->runningUnitTests()) {
-            return;
+        $prefix = trim(Settings::text('route_prefix', 'deploy'), '/');
+        if ($prefix === '' || preg_match('/\A[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\z/', $prefix) !== 1) {
+            throw new \InvalidArgumentException('The deployment prefix must contain literal path segments.');
         }
-
+        PreventRequestsDuringMaintenance::except([$prefix, $prefix.'/*']);
         $this->loadRoutesFrom(dirname(__DIR__).'/routes/deploy.php');
     }
 
     private function configureDeployLogChannel(): void
     {
-        $channelName = (string) config('cpanel-hosting.logging.channel', 'deploy');
+        $channelName = Settings::text('logging.channel', 'deploy');
         $channels = config('logging.channels', []);
 
-        if (array_key_exists($channelName, $channels)) {
+        if (is_array($channels) && array_key_exists($channelName, $channels)) {
             return;
         }
 
@@ -70,25 +73,22 @@ final class LaravelCpanelHostingServiceProvider extends PackageServiceProvider
 
     private function applyMysqlLegacyCompatibility(): void
     {
-        if (! (bool) config('cpanel-hosting.mysql_legacy_compat.enabled', true)) {
+        if (! Settings::flag('mysql_legacy_compat.enabled', true)) {
             return;
         }
 
-        $length = (int) config('cpanel-hosting.mysql_legacy_compat.length', 191);
-        if ($length < 1) {
-            return;
-        }
+        $length = Settings::positiveInteger('mysql_legacy_compat.length', 191);
 
         /** @var array<string, array<string, mixed>> $connections */
         $connections = config('database.connections', []);
-        $applyToAllConnections = (bool) config('cpanel-hosting.mysql_legacy_compat.all_connections', false);
+        $applyToAllConnections = Settings::flag('mysql_legacy_compat.all_connections', false);
 
         if ($applyToAllConnections) {
             foreach ($connections as $connection) {
                 $driver = (string) ($connection['driver'] ?? '');
 
                 if (in_array($driver, ['mysql', 'mariadb'], true)) {
-                    Schema::defaultStringLength($length);
+                    Builder::defaultStringLength($length);
 
                     return;
                 }
@@ -101,7 +101,7 @@ final class LaravelCpanelHostingServiceProvider extends PackageServiceProvider
         $defaultDriver = (string) data_get($connections, "{$defaultConnection}.driver", '');
 
         if (in_array($defaultDriver, ['mysql', 'mariadb'], true)) {
-            Schema::defaultStringLength($length);
+            Builder::defaultStringLength($length);
         }
     }
 

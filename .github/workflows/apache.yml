@@ -1,0 +1,23 @@
+name: Apache hosting rules
+
+on:
+  push:
+    paths: ['stubs/**', 'scripts/test-apache.py', '.github/workflows/apache.yml']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Apache executable without a host service
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y apache2-bin
+      - name: Exercise root and subdirectory hosting over HTTP
+        run: python3 scripts/test-apache.py

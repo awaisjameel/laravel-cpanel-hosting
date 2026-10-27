@@ -4,23 +4,21 @@ declare(strict_types=1);
 
 namespace Awaisjameel\LaravelCpanelHosting\Http\Middleware;
 
+use Awaisjameel\LaravelCpanelHosting\Support\Settings;
 use Closure;
+use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 final class EnsureDeployTokenIsValid
 {
     /**
-     * @var array<string, int[]>
-     */
-    private static array $attempts = [];
-
-    /**
      * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! config('cpanel-hosting.enabled', false)) {
+        if (! Settings::flag('enabled', false)) {
             abort(404);
         }
 
@@ -28,9 +26,7 @@ final class EnsureDeployTokenIsValid
             abort(403, 'Forbidden');
         }
 
-        if (! $this->passesRateLimit($request)) {
-            abort(429, 'Too many requests');
-        }
+        $this->enforceRateLimit($request);
 
         if ($this->hasValidWebhookSignature($request) || $this->hasValidToken($request)) {
             return $next($request);
@@ -47,8 +43,12 @@ final class EnsureDeployTokenIsValid
             $allowedIps = array_filter(array_map('trim', explode(',', $allowedIps)));
         }
 
-        if (! is_array($allowedIps) || $allowedIps === []) {
+        if ($allowedIps === null || $allowedIps === []) {
             return true;
+        }
+
+        if (! is_array($allowedIps)) {
+            return false;
         }
 
         $requestIp = (string) $request->ip();
@@ -58,17 +58,13 @@ final class EnsureDeployTokenIsValid
 
     private function hasValidToken(Request $request): bool
     {
-        $expectedToken = (string) config('cpanel-hosting.token', '');
+        $expectedToken = Settings::text('token');
         if ($expectedToken === '') {
             return false;
         }
 
         $provided = $request->header('X-Deploy-Token');
         if (! is_string($provided) || $provided === '') {
-            $provided = (string) $request->query('token', '');
-        }
-
-        if ($provided === '') {
             return false;
         }
 
@@ -77,7 +73,7 @@ final class EnsureDeployTokenIsValid
 
     private function hasValidWebhookSignature(Request $request): bool
     {
-        $secret = (string) config('cpanel-hosting.webhook_secret', '');
+        $secret = Settings::text('webhook_secret');
         if ($secret === '') {
             return false;
         }
@@ -98,32 +94,19 @@ final class EnsureDeployTokenIsValid
         return false;
     }
 
-    private function passesRateLimit(Request $request): bool
+    private function enforceRateLimit(Request $request): void
     {
-        if (! (bool) config('cpanel-hosting.rate_limit.enabled', false)) {
-            return true;
+        if (! Settings::flag('rate_limit.enabled', false)) {
+            return;
         }
 
-        $maxAttempts = max(1, (int) config('cpanel-hosting.rate_limit.max_attempts', 30));
-        $decaySeconds = max(1, (int) config('cpanel-hosting.rate_limit.decay_seconds', 60));
-        $key = (string) ($request->ip() ?? 'unknown');
-        $now = time();
-
-        $attempts = self::$attempts[$key] ?? [];
-        $attempts = array_values(array_filter(
-            $attempts,
-            static fn (int $timestamp): bool => $timestamp >= ($now - $decaySeconds)
-        ));
-
-        if (count($attempts) >= $maxAttempts) {
-            self::$attempts[$key] = $attempts;
-
-            return false;
+        $maxAttempts = Settings::positiveInteger('rate_limit.max_attempts', 30);
+        $decaySeconds = Settings::positiveInteger('rate_limit.decay_seconds', 60);
+        $limiter = new RateLimiter(Cache::store(Settings::text('rate_limit.store', 'file')));
+        $key = 'cpanel-deploy:'.hash('sha256', Settings::text('route_prefix', 'deploy').'|'.($request->ip() ?? 'unknown'));
+        if ($limiter->tooManyAttempts($key, $maxAttempts)) {
+            abort(429, 'Too many requests', ['Retry-After' => (string) $limiter->availableIn($key)]);
         }
-
-        $attempts[] = $now;
-        self::$attempts[$key] = $attempts;
-
-        return true;
+        $limiter->hit($key, $decaySeconds);
     }
 }

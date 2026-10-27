@@ -7,7 +7,7 @@ namespace Awaisjameel\LaravelCpanelHosting\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Awaisjameel\LaravelCpanelHosting\LaravelCpanelHosting
+ * @mixin \Awaisjameel\LaravelCpanelHosting\LaravelCpanelHosting
  */
 final class LaravelCpanelHosting extends Facade
 {

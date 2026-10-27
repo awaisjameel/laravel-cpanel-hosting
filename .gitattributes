@@ -18,3 +18,12 @@
 /UPGRADING.md       export-ignore
 /phpstan.neon.dist  export-ignore
 /phpstan-baseline.neon  export-ignore
+/vendor export-ignore
+/node_modules export-ignore
+/build export-ignore
+/coverage export-ignore
+/.phpunit.cache export-ignore
+/.phpunit.result.cache export-ignore
+/composer.lock export-ignore
+/scripts export-ignore
+/laravel-cpanel-hosting-spec.md export-ignore
